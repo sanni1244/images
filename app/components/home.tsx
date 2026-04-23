@@ -7,9 +7,9 @@ interface Project {
   id: string;
   title?: string;
   description?: string;
-  category?: string; // 'Images', 'Videos', 'Concept Art', 'Music'
-  mediaUrl?: string; // URL for image, video, or audio
-  coverArtUrl?: string; // URL for audio cover art
+  category?: string;
+  mediaUrl?: string;
+  coverArtUrl?: string;
   mediaType?: "image" | "video" | "audio";
   promptUsed?: string;
   toolUsed?: string;
@@ -49,9 +49,14 @@ export default function Home() {
     tools: "Midjourney v6, Runway Gen-2, Stable Diffusion XL, Pika Labs",
   });
 
-  // Modal states
+  // Modal & Loading states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [infoModal, setInfoModal] = useState({ isOpen: false, message: "" });
+  
+  const [isSavingMedia, setIsSavingMedia] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
 
   // Form states for Projects
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -110,8 +115,8 @@ export default function Home() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File too large. Keep under 5MB for database performance.");
+      if (file.size > 2.5 * 1024 * 1024) {
+        setInfoModal({ isOpen: true, message: "File too large. Keep under 2.5MB to prevent server payload limits." });
         return;
       }
       const base64 = await convertToBase64(file);
@@ -135,6 +140,8 @@ export default function Home() {
 
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSavingMedia(true);
+    
     const projectData = {
       title: formTitle,
       description: formDesc,
@@ -166,11 +173,15 @@ export default function Home() {
           setProjects([...projects, data.project]);
         }
         cancelEdit();
+        setInfoModal({ isOpen: true, message: "Media saved successfully." });
       } else {
-        alert("Failed to save project.");
+        setInfoModal({ isOpen: true, message: "Failed to save project. File might still be too large." });
       }
     } catch (error) {
       console.error("Error saving project:", error);
+      setInfoModal({ isOpen: true, message: "An error occurred while saving." });
+    } finally {
+      setIsSavingMedia(false);
     }
   };
 
@@ -209,6 +220,7 @@ export default function Home() {
 
   const confirmDeleteProject = async () => {
     if (!projectToDelete) return;
+    setIsDeletingProject(true);
     try {
       const response = await fetch("/api/projects", {
         method: "DELETE",
@@ -217,10 +229,13 @@ export default function Home() {
       });
       if (response.ok) {
         setProjects(projects.filter((p) => p.id !== projectToDelete));
+      } else {
+        setInfoModal({ isOpen: true, message: "Failed to delete project." });
       }
     } catch (error) {
       console.error("Error deleting project:", error);
     } finally {
+      setIsDeletingProject(false);
       setDeleteModalOpen(false);
       setProjectToDelete(null);
     }
@@ -233,6 +248,7 @@ export default function Home() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSavingProfile(true);
     try {
       const response = await fetch("/api/profile", {
         method: "POST",
@@ -241,10 +257,15 @@ export default function Home() {
       });
       if (response.ok) {
         setProfile(editProfile);
-        alert("Profile updated!");
+        setInfoModal({ isOpen: true, message: "Profile updated successfully!" });
+      } else {
+        setInfoModal({ isOpen: true, message: "Failed to update profile." });
       }
     } catch (error) {
       console.error("Error updating profile:", error);
+      setInfoModal({ isOpen: true, message: "An error occurred while updating the profile." });
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -261,11 +282,30 @@ export default function Home() {
             <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
             <p className="text-zinc-400 text-sm mb-6">Are you sure you want to delete this creation? This action cannot be undone.</p>
             <div className="flex gap-4 justify-end">
-              <button onClick={() => { setDeleteModalOpen(false); setProjectToDelete(null); }} className="px-4 py-2 text-sm font-bold text-zinc-300 hover:text-white transition">
+              <button onClick={() => { setDeleteModalOpen(false); setProjectToDelete(null); }} className="px-4 py-2 text-sm font-bold text-zinc-300 hover:text-white transition" disabled={isDeletingProject}>
                 Cancel
               </button>
-              <button onClick={confirmDeleteProject} className="px-4 py-2 text-sm font-bold bg-red-600 hover:bg-red-500 text-white rounded-xl transition">
-                Delete
+              <button onClick={confirmDeleteProject} disabled={isDeletingProject} className="px-4 py-2 text-sm font-bold bg-red-600 hover:bg-red-500 text-white rounded-xl transition flex items-center justify-center min-w-[80px]">
+                {isDeletingProject ? (
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Modal */}
+      {infoModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
+            <p className="text-zinc-300 text-sm mb-6">{infoModal.message}</p>
+            <div className="flex justify-end">
+              <button onClick={() => setInfoModal({ isOpen: false, message: "" })} className="px-4 py-2 text-sm font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-xl transition">
+                OK
               </button>
             </div>
           </div>
@@ -528,11 +568,16 @@ export default function Home() {
                   </div>
 
                   <div className="col-span-1 md:col-span-2 flex flex-col md:flex-row gap-4 mt-4">
-                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg w-full md:w-auto text-center">
-                      Save Media
+                    <button type="submit" disabled={isSavingMedia} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg w-full md:w-auto text-center flex items-center justify-center min-w-[150px]">
+                      {isSavingMedia ? (
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : "Save Media"}
                     </button>
                     {editingProjectId && (
-                      <button type="button" onClick={cancelEdit} className="bg-zinc-800 text-white px-8 py-3 rounded-xl hover:bg-zinc-700 transition w-full md:w-auto text-center">
+                      <button type="button" onClick={cancelEdit} disabled={isSavingMedia} className="bg-zinc-800 text-white px-8 py-3 rounded-xl hover:bg-zinc-700 transition w-full md:w-auto text-center">
                         Cancel
                       </button>
                     )}
@@ -596,8 +641,13 @@ export default function Home() {
                   </div>
 
                   <div className="col-span-1 md:col-span-2 mt-4">
-                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg w-full md:w-auto text-center">
-                      Save Profile
+                    <button type="submit" disabled={isSavingProfile} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg w-full md:w-auto text-center flex items-center justify-center min-w-[150px]">
+                      {isSavingProfile ? (
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : "Save Profile"}
                     </button>
                   </div>
                 </form>
