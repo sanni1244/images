@@ -10,12 +10,14 @@ interface Project {
   category?: string;
   mediaUrl?: string;
   coverArtUrl?: string;
-  externalLink?: string; // URL for Spotify, YouTube, Soundcloud, etc.
-  mediaType?: "image" | "video" | "audio";
+  externalLink?: string; 
+  mediaType?: "image" | "video" | "audio" | "text";
   promptUsed?: string;
   toolUsed?: string;
   tags?: string;
   date?: string;
+  artist?: string;
+  textContent?: string;
 }
 
 interface Profile {
@@ -26,7 +28,7 @@ interface Profile {
   email?: string;
   instagram?: string;
   twitter?: string;
-  musicUrl?: string; // General music link for the artist profile
+  musicUrl?: string; 
   portraitImage?: string;
   tools?: string;
 }
@@ -68,11 +70,13 @@ export default function Home() {
   const [formMediaUrl, setFormMediaUrl] = useState("");
   const [formCoverArtUrl, setFormCoverArtUrl] = useState("");
   const [formExternalLink, setFormExternalLink] = useState("");
-  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio">("image");
+  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio" | "text">("image");
   const [formPromptUsed, setFormPromptUsed] = useState("");
   const [formToolUsed, setFormToolUsed] = useState("");
   const [formTags, setFormTags] = useState("");
   const [formDate, setFormDate] = useState("");
+  const [formArtist, setFormArtist] = useState("");
+  const [formTextContent, setFormTextContent] = useState("");
   
   const [mediaMode, setMediaMode] = useState<"url" | "upload">("url");
   const [coverArtMode, setCoverArtMode] = useState<"url" | "upload">("url");
@@ -118,8 +122,8 @@ export default function Home() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2.5 * 1024 * 1024) {
-        setInfoModal({ isOpen: true, message: "File too large. Keep under 2.5MB to prevent server payload limits." });
+      if (file.size > 3.5 * 1024 * 1024) {
+        setInfoModal({ isOpen: true, message: "File too large. Keep under 3.5MB for Vercel Hobby limits. Use external cloud storage for larger files." });
         return;
       }
       const base64 = await convertToBase64(file);
@@ -149,7 +153,7 @@ export default function Home() {
       title: formTitle,
       description: formDesc,
       category: formCategory,
-      mediaUrl: formMediaUrl,
+      mediaUrl: formMediaType !== "text" ? formMediaUrl : "",
       coverArtUrl: formMediaType === "audio" ? formCoverArtUrl : "",
       externalLink: formExternalLink,
       mediaType: formMediaType,
@@ -157,6 +161,8 @@ export default function Home() {
       toolUsed: formToolUsed,
       tags: formTags,
       date: formDate,
+      artist: formArtist,
+      textContent: formMediaType === "text" ? formTextContent : "",
     };
 
     try {
@@ -203,6 +209,8 @@ export default function Home() {
     setFormToolUsed(project.toolUsed || "");
     setFormTags(project.tags || "");
     setFormDate(project.date || "");
+    setFormArtist(project.artist || "");
+    setFormTextContent(project.textContent || "");
     
     setMediaMode(project.mediaUrl?.startsWith("data:") ? "upload" : "url");
     setCoverArtMode(project.coverArtUrl?.startsWith("data:") ? "upload" : "url");
@@ -222,6 +230,8 @@ export default function Home() {
     setFormToolUsed("");
     setFormTags("");
     setFormDate("");
+    setFormArtist("");
+    setFormTextContent("");
   };
 
   const confirmDeleteProject = async () => {
@@ -275,7 +285,15 @@ export default function Home() {
     }
   };
 
-  const categories = ["All", "Images", "Videos", "Concept Art", "Music"];
+  const allCategories = [
+    "All", "Images", "Videos", "Concept Art", "Music", 
+    "Quotes", "Books", "Stories", "3D Models", "Code"
+  ];
+  
+  const visibleCategories = allCategories.filter(cat => 
+    cat === "All" || projects.some(p => p.category === cat) || isAdmin
+  );
+
   const filteredProjects = activeFilter === "All" ? projects : projects.filter((p) => p.category === activeFilter);
 
   return (
@@ -404,15 +422,15 @@ export default function Home() {
 
         {/* GALLERY SECTION */}
         <section className="mb-24">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-            <h2 className="text-3xl font-light">
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 gap-6">
+            <h2 className="text-3xl font-light whitespace-nowrap">
               <span className="font-bold text-white">GENERATIVE</span> GALLERY
             </h2>
 
             {/* Filtering Navigation */}
-            <div className="flex flex-wrap gap-2 bg-zinc-900/50 p-1 rounded-full border border-zinc-800 w-full md:w-auto">
-              {categories.map((cat) => (
-                <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-4 md:px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-full transition-all flex-1 md:flex-none ${activeFilter === cat ? "bg-fuchsia-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}>
+            <div className="flex flex-wrap gap-2 bg-zinc-900/50 p-1 rounded-3xl border border-zinc-800 w-full xl:w-auto overflow-hidden">
+              {visibleCategories.map((cat) => (
+                <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-4 md:px-5 py-2 text-[10px] md:text-xs font-bold uppercase tracking-wider rounded-full transition-all flex-1 md:flex-none ${activeFilter === cat ? "bg-fuchsia-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}>
                   {cat}
                 </button>
               ))}
@@ -428,7 +446,7 @@ export default function Home() {
               {filteredProjects.map((project) => (
                 <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col">
                   {/* Media Area */}
-                  {project.mediaUrl && (
+                  {(project.mediaUrl || project.mediaType === "text") && (
                     <div className="w-full aspect-[4/3] bg-black relative overflow-hidden flex flex-col">
                       {project.mediaType === "video" ? (
                         <video src={project.mediaUrl} autoPlay loop muted playsInline className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -443,43 +461,69 @@ export default function Home() {
                              <audio src={project.mediaUrl} controls className="w-full h-10 outline-none rounded-full" />
                            </div>
                         </div>
+                      ) : project.mediaType === "text" ? (
+                        <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center">
+                          <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
+                            &quot;{project.textContent}&quot;
+                          </blockquote>
+                        </div>
                       ) : (
-                        <Image src={project.mediaUrl} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                        <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                       )}
                       <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-20">{project.category}</span>
                     </div>
                   )}
 
-                  <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex justify-between items-start mb-2">
+                  <div className="p-6 flex-1 flex flex-col gap-4">
+                    <div className="flex justify-between items-start">
                       <h3 className="text-xl font-bold text-white">{project.title || "Untitled"}</h3>
-                      {project.toolUsed && <span className="text-[10px] text-fuchsia-400 bg-fuchsia-500/10 px-2 py-1 rounded border border-fuchsia-500/20">{project.toolUsed}</span>}
+                      {project.toolUsed && <span className="text-[10px] font-mono text-fuchsia-400 bg-fuchsia-500/10 px-2 py-1 rounded border border-fuchsia-500/20 whitespace-nowrap">{project.toolUsed}</span>}
                     </div>
 
-                    <p className="text-zinc-400 text-sm mb-4 line-clamp-2">{project.description}</p>
-
-                    {/* AI Prompt Section */}
-                    {project.promptUsed && (
-                      <div className="mb-4 bg-black/50 p-3 rounded-lg border border-zinc-800/50">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Prompt</p>
-                        <p className="text-xs text-zinc-300 font-mono line-clamp-3">{project.promptUsed}</p>
+                    {/* Artist Display - Distinct Styling */}
+                    {project.artist && (
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-4 bg-fuchsia-500 rounded-full"></div>
+                        <span className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Artist: <span className="text-fuchsia-300">{project.artist}</span></span>
                       </div>
                     )}
 
-                    <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-zinc-800/50">
-                      {project.tags?.split(",").map(
-                        (tag, i) =>
-                          tag.trim() && (
-                            <span key={i} className="text-[10px] text-zinc-500 uppercase">
-                              #{tag.trim()}
-                            </span>
-                          )
-                      )}
-                    </div>
+                    {/* Description Display - Distinct Styling */}
+                    {project.description && (
+                      <p className="text-zinc-400 text-sm leading-relaxed border-l-2 border-zinc-800 pl-3 line-clamp-3">
+                        {project.description}
+                      </p>
+                    )}
 
+                    {/* AI Prompt Section - Distinct Styling */}
+                    {project.promptUsed && (
+                      <div className="bg-zinc-950/80 p-3 rounded-lg border border-zinc-800 shadow-inner">
+                        <div className="flex items-center gap-2 mb-2">
+                           <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l3 3-3 3m5 0h3M4 12a8 8 0 1116 0 8 8 0 01-16 0z"></path></svg>
+                           <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Input Prompt</p>
+                        </div>
+                        <p className="text-[11px] text-emerald-400/80 font-mono line-clamp-3">{project.promptUsed}</p>
+                      </div>
+                    )}
+
+                    {/* Tags Section - Distinct Styling */}
+                    {project.tags && (
+                      <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-zinc-800/50">
+                        {project.tags?.split(",").map(
+                          (tag, i) =>
+                            tag.trim() && (
+                              <span key={i} className="text-[10px] bg-zinc-800/50 border border-zinc-700/50 px-2 py-1 rounded-md text-zinc-400">
+                                #{tag.trim()}
+                              </span>
+                            )
+                        )}
+                      </div>
+                    )}
+
+                    {/* External Link Section */}
                     {project.externalLink && (
-                      <div className="mt-4 pt-4 border-t border-zinc-800/50">
-                        <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 uppercase tracking-widest font-bold flex items-center gap-1">
+                      <div className="mt-2 pt-4 border-t border-zinc-800/50">
+                        <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[10px] bg-white text-black py-2 px-4 rounded-full hover:bg-zinc-200 uppercase tracking-widest font-bold inline-flex items-center gap-2 transition-colors">
                           View / Listen 
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                         </a>
@@ -531,29 +575,45 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">Artist / Author</label>
+                    <input type="text" value={formArtist} onChange={(e) => setFormArtist(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                  </div>
+
+                  <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Category</label>
                     <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
-                      <option value="Images">Images</option>
-                      <option value="Videos">Videos</option>
-                      <option value="Concept Art">Concept Art</option>
-                      <option value="Music">Music</option>
+                      {allCategories.filter(c => c !== "All").map(cat => (
+                         <option key={cat} value={cat}>{cat}</option>
+                      ))}
                     </select>
                   </div>
 
-                  <div className="space-y-2 col-span-1 md:col-span-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Media Upload / Link</label>
-                    <div className="flex flex-col md:flex-row gap-2">
-                      <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio")} className="bg-black border border-zinc-800 p-3 text-white rounded-xl focus:outline-none">
+                  <div className="space-y-2">
+                     <label className="text-xs font-bold text-zinc-500 uppercase">Content Format</label>
+                     <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio" | "text")} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="audio">Audio</option>
-                      </select>
-                      {mediaMode === "url" ? <input type="url" placeholder="https://..." value={formMediaUrl} onChange={(e) => setFormMediaUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*,video/*,audio/*" onChange={(e) => handleFileUpload(e, setFormMediaUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
-                      <button type="button" onClick={() => setMediaMode(mediaMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
-                        Toggle Mode
-                      </button>
-                    </div>
+                        <option value="text">Text (Story, Quote, Book)</option>
+                     </select>
                   </div>
+
+                  {formMediaType === "text" ? (
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase">Text Content (Quote / Story)</label>
+                      <textarea value={formTextContent} onChange={(e) => setFormTextContent(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" rows={6}></textarea>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase">Media Upload / Link</label>
+                      <div className="flex flex-col md:flex-row gap-2">
+                        {mediaMode === "url" ? <input type="url" placeholder="https://..." value={formMediaUrl} onChange={(e) => setFormMediaUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*,video/*,audio/*" onChange={(e) => handleFileUpload(e, setFormMediaUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
+                        <button type="button" onClick={() => setMediaMode(mediaMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
+                          Toggle Mode
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {formMediaType === "audio" && (
                     <div className="space-y-2 col-span-1 md:col-span-2">
@@ -578,13 +638,13 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">AI Tool (e.g., Suno, Midjourney)</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">AI Tool (e.g., Suno, ChatGPT)</label>
                     <input type="text" value={formToolUsed} onChange={(e) => setFormToolUsed(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Tags</label>
-                    <input type="text" placeholder="synthwave, electronic, neon..." value={formTags} onChange={(e) => setFormTags(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                    <input type="text" placeholder="synthwave, story, neon..." value={formTags} onChange={(e) => setFormTags(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
