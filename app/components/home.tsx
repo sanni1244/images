@@ -103,8 +103,8 @@ export default function Home() {
             setEditProfile(data);
           }
         }
-      } catch (error) {
-        console.error("Failed to load data", error);
+      } catch (err) {
+        console.error("Failed to load data", err);
       } finally {
         setIsLoading(false);
       }
@@ -117,7 +117,7 @@ export default function Home() {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
+      reader.onerror = (err) => reject(err);
     });
   };
 
@@ -189,8 +189,8 @@ export default function Home() {
       } else {
         setInfoModal({ isOpen: true, message: "Failed to save project. File might still be too large." });
       }
-    } catch (error) {
-      console.error("Error saving project:", error);
+    } catch (err) {
+      console.error("Error saving project:", err);
       setInfoModal({ isOpen: true, message: "An error occurred while saving." });
     } finally {
       setIsSavingMedia(false);
@@ -250,8 +250,8 @@ export default function Home() {
       } else {
         setInfoModal({ isOpen: true, message: "Failed to delete project." });
       }
-    } catch (error) {
-      console.error("Error deleting project:", error);
+    } catch (err) {
+      console.error("Error deleting project:", err);
     } finally {
       setIsDeletingProject(false);
       setDeleteModalOpen(false);
@@ -279,8 +279,8 @@ export default function Home() {
       } else {
         setInfoModal({ isOpen: true, message: "Failed to update profile." });
       }
-    } catch (error) {
-      console.error("Error updating profile:", error);
+    } catch (err) {
+      console.error("Error updating profile:", err);
       setInfoModal({ isOpen: true, message: "An error occurred while updating the profile." });
     } finally {
       setIsSavingProfile(false);
@@ -460,6 +460,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
               {sortedProjects.map((project) => (
                 <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col h-fit">
+                  
                   {/* Media Area - Adjusted aspect ratio to be smaller */}
                   {(project.mediaUrl || project.mediaType === "text") && (
                     <div className="w-full aspect-video bg-black relative overflow-hidden flex flex-col">
@@ -479,19 +480,19 @@ export default function Home() {
                       ) : project.mediaType === "text" ? (
                         <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center pb-16">
                           <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
-                            {project.textContent}
+                            &quot;{project.textContent}&quot;
                           </blockquote>
                         </div>
                       ) : (
                         <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                       )}
                       
-                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-30">
+                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-40">
                         {project.category}
                       </span>
 
                       {/* Title & Tool Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent z-20 flex justify-between items-end gap-2">
+                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent z-30 flex justify-between items-end gap-2">
                         <h3 className="text-lg font-bold text-white truncate drop-shadow-md">{project.title || "Untitled"}</h3>
                         {project.toolUsed && (
                           <span className="text-[9px] font-mono text-fuchsia-400 bg-black/60 px-2 py-0.5 rounded border border-fuchsia-500/20 whitespace-nowrap backdrop-blur-md">
@@ -559,7 +560,7 @@ export default function Home() {
                   ))}
 
                   {isAdmin && (
-                    <div className="absolute top-3 left-3 flex gap-2 z-40">
+                    <div className="absolute top-3 left-3 flex gap-2 z-50">
                       <button onClick={() => startEditProject(project)} className="bg-white text-black p-2 rounded-full shadow hover:bg-zinc-200">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
@@ -621,7 +622,7 @@ export default function Home() {
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="audio">Audio</option>
-                        <option value="text">Text (Quote, Story)</option>
+                        <option value="text">Text (Quotes)</option>
                      </select>
                   </div>
 
