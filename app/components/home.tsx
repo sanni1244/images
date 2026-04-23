@@ -7,11 +7,12 @@ interface Project {
   id: string;
   title?: string;
   description?: string;
-  category?: string; // 'Image', 'Video', 'Concept Art'
-  mediaUrl?: string; // URL for image or video
-  mediaType?: "image" | "video";
-  promptUsed?: string; // AI specific: What was the prompt?
-  toolUsed?: string; // AI specific: Midjourney, Runway, Stable Diffusion, etc.
+  category?: string; // 'Images', 'Videos', 'Concept Art', 'Music'
+  mediaUrl?: string; // URL for image, video, or audio
+  coverArtUrl?: string; // URL for audio cover art
+  mediaType?: "image" | "video" | "audio";
+  promptUsed?: string;
+  toolUsed?: string;
   tags?: string;
   date?: string;
 }
@@ -48,18 +49,25 @@ export default function Home() {
     tools: "Midjourney v6, Runway Gen-2, Stable Diffusion XL, Pika Labs",
   });
 
+  // Modal states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+
   // Form states for Projects
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formDesc, setFormDesc] = useState("");
-  const [formCategory, setFormCategory] = useState("Image");
+  const [formCategory, setFormCategory] = useState("Images");
   const [formMediaUrl, setFormMediaUrl] = useState("");
-  const [formMediaType, setFormMediaType] = useState<"image" | "video">("image");
+  const [formCoverArtUrl, setFormCoverArtUrl] = useState("");
+  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio">("image");
   const [formPromptUsed, setFormPromptUsed] = useState("");
   const [formToolUsed, setFormToolUsed] = useState("");
   const [formTags, setFormTags] = useState("");
   const [formDate, setFormDate] = useState("");
+  
   const [mediaMode, setMediaMode] = useState<"url" | "upload">("url");
+  const [coverArtMode, setCoverArtMode] = useState<"url" | "upload">("url");
 
   // Form states for Profile
   const [editProfile, setEditProfile] = useState<Profile>(profile);
@@ -132,6 +140,7 @@ export default function Home() {
       description: formDesc,
       category: formCategory,
       mediaUrl: formMediaUrl,
+      coverArtUrl: formMediaType === "audio" ? formCoverArtUrl : "",
       mediaType: formMediaType,
       promptUsed: formPromptUsed,
       toolUsed: formToolUsed,
@@ -170,14 +179,17 @@ export default function Home() {
     setEditingProjectId(project.id);
     setFormTitle(project.title || "");
     setFormDesc(project.description || "");
-    setFormCategory(project.category || "Image");
+    setFormCategory(project.category || "Images");
     setFormMediaUrl(project.mediaUrl || "");
+    setFormCoverArtUrl(project.coverArtUrl || "");
     setFormMediaType(project.mediaType || "image");
     setFormPromptUsed(project.promptUsed || "");
     setFormToolUsed(project.toolUsed || "");
     setFormTags(project.tags || "");
     setFormDate(project.date || "");
+    
     setMediaMode(project.mediaUrl?.startsWith("data:") ? "upload" : "url");
+    setCoverArtMode(project.coverArtUrl?.startsWith("data:") ? "upload" : "url");
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
@@ -185,8 +197,9 @@ export default function Home() {
     setEditingProjectId(null);
     setFormTitle("");
     setFormDesc("");
-    setFormCategory("Image");
+    setFormCategory("Images");
     setFormMediaUrl("");
+    setFormCoverArtUrl("");
     setFormMediaType("image");
     setFormPromptUsed("");
     setFormToolUsed("");
@@ -194,20 +207,28 @@ export default function Home() {
     setFormDate("");
   };
 
-  const handleDeleteProject = async (id: string) => {
-    if (!window.confirm("Delete this creation?")) return;
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
     try {
       const response = await fetch("/api/projects", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: projectToDelete }),
       });
       if (response.ok) {
-        setProjects(projects.filter((p) => p.id !== id));
+        setProjects(projects.filter((p) => p.id !== projectToDelete));
       }
     } catch (error) {
       console.error("Error deleting project:", error);
+    } finally {
+      setDeleteModalOpen(false);
+      setProjectToDelete(null);
     }
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setProjectToDelete(id);
+    setDeleteModalOpen(true);
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -227,11 +248,30 @@ export default function Home() {
     }
   };
 
-  const categories = ["All", "Images", "Videos", "Concept Art"];
+  const categories = ["All", "Images", "Videos", "Concept Art", "Music"];
   const filteredProjects = activeFilter === "All" ? projects : projects.filter((p) => p.category === activeFilter);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans selection:bg-fuchsia-500 selection:text-white pb-24">
+      
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
+            <p className="text-zinc-400 text-sm mb-6">Are you sure you want to delete this creation? This action cannot be undone.</p>
+            <div className="flex gap-4 justify-end">
+              <button onClick={() => { setDeleteModalOpen(false); setProjectToDelete(null); }} className="px-4 py-2 text-sm font-bold text-zinc-300 hover:text-white transition">
+                Cancel
+              </button>
+              <button onClick={confirmDeleteProject} className="px-4 py-2 text-sm font-bold bg-red-600 hover:bg-red-500 text-white rounded-xl transition">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <header className="flex justify-between items-center p-6 border-b border-zinc-900 backdrop-blur-md sticky top-0 z-50">
         <div className="text-xl font-bold tracking-[0.2em] text-fuchsia-500 uppercase">{profile.name || "AI.STUDIO"}</div>
@@ -285,7 +325,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="flex gap-6 pt-6">
+              <div className="flex flex-wrap gap-6 pt-6">
                 {profile.instagram && (
                   <a href={profile.instagram} className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
                     Instagram
@@ -319,9 +359,9 @@ export default function Home() {
             </h2>
 
             {/* Filtering Navigation */}
-            <div className="flex gap-2 bg-zinc-900/50 p-1 rounded-full border border-zinc-800">
+            <div className="flex flex-wrap gap-2 bg-zinc-900/50 p-1 rounded-full border border-zinc-800 w-full md:w-auto">
               {categories.map((cat) => (
-                <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-full transition-all ${activeFilter === cat ? "bg-fuchsia-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}>
+                <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-4 md:px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-full transition-all flex-1 md:flex-none ${activeFilter === cat ? "bg-fuchsia-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}>
                   {cat}
                 </button>
               ))}
@@ -338,9 +378,24 @@ export default function Home() {
                 <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col">
                   {/* Media Area */}
                   {project.mediaUrl && (
-                    <div className="w-full aspect-[4/3] bg-black relative overflow-hidden">
-                      {project.mediaType === "video" ? <video src={project.mediaUrl} autoPlay loop muted playsInline className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" /> : <Image src={project.mediaUrl} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />}
-                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md">{project.category}</span>
+                    <div className="w-full aspect-[4/3] bg-black relative overflow-hidden flex flex-col">
+                      {project.mediaType === "video" ? (
+                        <video src={project.mediaUrl} autoPlay loop muted playsInline className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      ) : project.mediaType === "audio" ? (
+                        <div className="relative w-full h-full flex flex-col items-center justify-end">
+                           {project.coverArtUrl ? (
+                             <Image src={project.coverArtUrl} alt={project.title || "Cover Art"} fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" />
+                           ) : (
+                             <div className="absolute inset-0 flex items-center justify-center text-zinc-700 text-xs">No Cover Art</div>
+                           )}
+                           <div className="z-10 w-full p-4 bg-gradient-to-t from-black via-black/80 to-transparent">
+                             <audio src={project.mediaUrl} controls className="w-full h-10 outline-none rounded-full" />
+                           </div>
+                        </div>
+                      ) : (
+                        <Image src={project.mediaUrl} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                      )}
+                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-20">{project.category}</span>
                     </div>
                   )}
 
@@ -373,13 +428,13 @@ export default function Home() {
                   </div>
 
                   {isAdmin && (
-                    <div className="absolute top-3 left-3 flex gap-2 z-20">
+                    <div className="absolute top-3 left-3 flex gap-2 z-30">
                       <button onClick={() => startEditProject(project)} className="bg-white text-black p-2 rounded-full shadow hover:bg-zinc-200">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                         </svg>
                       </button>
-                      <button onClick={() => handleDeleteProject(project.id)} className="bg-red-500 text-white p-2 rounded-full shadow hover:bg-red-600">
+                      <button onClick={() => handleDeleteClick(project.id)} className="bg-red-500 text-white p-2 rounded-full shadow hover:bg-red-600">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
@@ -397,7 +452,7 @@ export default function Home() {
           <div className="mt-32 pt-10 border-t border-zinc-800 relative">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 px-4 text-xs font-bold text-fuchsia-500 tracking-widest uppercase">Admin Area</div>
 
-            <div className="flex gap-4 mb-8 justify-center">
+            <div className="flex flex-col md:flex-row gap-4 mb-8 justify-center">
               <button onClick={() => setAdminTab("project")} className={`px-6 py-3 rounded-full text-sm font-bold transition-all ${adminTab === "project" ? "bg-fuchsia-600 text-white" : "bg-zinc-900 text-zinc-400 hover:text-white"}`}>
                 Manage Media
               </button>
@@ -407,7 +462,7 @@ export default function Home() {
             </div>
 
             {adminTab === "project" && (
-              <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-2xl max-w-4xl mx-auto">
+              <div className="bg-zinc-900/50 border border-zinc-800 p-6 md:p-8 rounded-2xl max-w-4xl mx-auto">
                 <h2 className="text-2xl font-bold mb-6 text-white">{editingProjectId ? "Edit Creation" : "Upload New Creation"}</h2>
                 <form onSubmit={handleSaveProject} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -421,22 +476,36 @@ export default function Home() {
                       <option value="Images">Images</option>
                       <option value="Videos">Videos</option>
                       <option value="Concept Art">Concept Art</option>
+                      <option value="Music">Music</option>
                     </select>
                   </div>
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Media Upload / Link</label>
-                    <div className="flex gap-2">
-                      <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video")} className="bg-black border border-zinc-800 p-3 text-white rounded-xl focus:outline-none">
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio")} className="bg-black border border-zinc-800 p-3 text-white rounded-xl focus:outline-none">
                         <option value="image">Image</option>
                         <option value="video">Video</option>
+                        <option value="audio">Audio</option>
                       </select>
-                      {mediaMode === "url" ? <input type="url" placeholder="https://..." value={formMediaUrl} onChange={(e) => setFormMediaUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*,video/*" onChange={(e) => handleFileUpload(e, setFormMediaUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
-                      <button type="button" onClick={() => setMediaMode(mediaMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700">
+                      {mediaMode === "url" ? <input type="url" placeholder="https://..." value={formMediaUrl} onChange={(e) => setFormMediaUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*,video/*,audio/*" onChange={(e) => handleFileUpload(e, setFormMediaUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
+                      <button type="button" onClick={() => setMediaMode(mediaMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
                         Toggle Mode
                       </button>
                     </div>
                   </div>
+
+                  {formMediaType === "audio" && (
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase">Cover Art Upload / Link</label>
+                      <div className="flex flex-col md:flex-row gap-2">
+                        {coverArtMode === "url" ? <input type="url" placeholder="https://..." value={formCoverArtUrl} onChange={(e) => setFormCoverArtUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setFormCoverArtUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
+                        <button type="button" onClick={() => setCoverArtMode(coverArtMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
+                          Toggle Mode
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">AI Prompt Used</label>
@@ -444,13 +513,13 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">AI Tool (e.g., Midjourney v6)</label>
+                    <label className="text-xs font-bold text-zinc-500 uppercase">AI Tool (e.g., Suno, Midjourney)</label>
                     <input type="text" value={formToolUsed} onChange={(e) => setFormToolUsed(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Tags</label>
-                    <input type="text" placeholder="cyberpunk, neon, 3d..." value={formTags} onChange={(e) => setFormTags(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                    <input type="text" placeholder="synthwave, electronic, neon..." value={formTags} onChange={(e) => setFormTags(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
@@ -458,12 +527,12 @@ export default function Home() {
                     <textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" rows={3}></textarea>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 flex gap-4 mt-4">
-                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg">
+                  <div className="col-span-1 md:col-span-2 flex flex-col md:flex-row gap-4 mt-4">
+                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg w-full md:w-auto text-center">
                       Save Media
                     </button>
                     {editingProjectId && (
-                      <button type="button" onClick={cancelEdit} className="bg-zinc-800 text-white px-8 py-3 rounded-xl hover:bg-zinc-700 transition">
+                      <button type="button" onClick={cancelEdit} className="bg-zinc-800 text-white px-8 py-3 rounded-xl hover:bg-zinc-700 transition w-full md:w-auto text-center">
                         Cancel
                       </button>
                     )}
@@ -473,7 +542,7 @@ export default function Home() {
             )}
 
             {adminTab === "profile" && (
-              <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-2xl max-w-4xl mx-auto">
+              <div className="bg-zinc-900/50 border border-zinc-800 p-6 md:p-8 rounded-2xl max-w-4xl mx-auto">
                 <h2 className="text-2xl font-bold mb-6 text-white">Artist Profile</h2>
                 <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -518,16 +587,16 @@ export default function Home() {
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Profile Portrait</label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col md:flex-row gap-2">
                       {profileImageMode === "url" ? <input type="url" placeholder="https://..." value={editProfile.portraitImage || ""} onChange={(e) => setEditProfile({ ...editProfile, portraitImage: e.target.value })} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, (val) => setEditProfile({ ...editProfile, portraitImage: val }))} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
-                      <button type="button" onClick={() => setProfileImageMode(profileImageMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700">
+                      <button type="button" onClick={() => setProfileImageMode(profileImageMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
                         Toggle Mode
                       </button>
                     </div>
                   </div>
 
                   <div className="col-span-1 md:col-span-2 mt-4">
-                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg">
+                    <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-8 py-3 rounded-xl transition shadow-lg w-full md:w-auto text-center">
                       Save Profile
                     </button>
                   </div>
