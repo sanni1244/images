@@ -11,13 +11,14 @@ interface Project {
   mediaUrl?: string;
   coverArtUrl?: string;
   externalLink?: string; 
-  mediaType?: "image" | "video" | "audio" | "text" | "code-display" | "code-runner";
+  mediaType?: "image" | "video" | "audio" | "text" | "code";
   promptUsed?: string;
   toolUsed?: string;
   tags?: string;
   date?: string;
   artist?: string;
   textContent?: string;
+  isRunnable?: boolean;
 }
 
 interface Profile {
@@ -72,13 +73,14 @@ export default function Home() {
   const [formMediaUrl, setFormMediaUrl] = useState("");
   const [formCoverArtUrl, setFormCoverArtUrl] = useState("");
   const [formExternalLink, setFormExternalLink] = useState("");
-  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio" | "text" | "code-display" | "code-runner">("image");
+  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio" | "text" | "code">("image");
   const [formPromptUsed, setFormPromptUsed] = useState("");
   const [formToolUsed, setFormToolUsed] = useState("");
   const [formTags, setFormTags] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formArtist, setFormArtist] = useState("");
   const [formTextContent, setFormTextContent] = useState("");
+  const [formIsRunnable, setFormIsRunnable] = useState(false);
   
   const [mediaMode, setMediaMode] = useState<"url" | "upload">("url");
   const [coverArtMode, setCoverArtMode] = useState<"url" | "upload">("url");
@@ -87,29 +89,17 @@ export default function Home() {
   const [editProfile, setEditProfile] = useState<Profile>(profile);
   const [profileImageMode, setProfileImageMode] = useState<"url" | "upload">("url");
 
-  // Handle Meta tags, title, and favicon natively
   useEffect(() => {
+    // Set Title & Favicon
     document.title = "Sanni Ai";
-
     let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
     if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.head.appendChild(link);
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.getElementsByTagName("head")[0].appendChild(link);
     }
-    // Free terminal/code icon
-    link.href = 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png'; 
+    link.href = "https://cdn-icons-png.flaticon.com/512/1005/1005141.png"; // Free code icon
 
-    let metaDesc = document.querySelector("meta[name='description']") as HTMLMetaElement;
-    if (!metaDesc) {
-      metaDesc = document.createElement('meta');
-      metaDesc.name = 'description';
-      document.head.appendChild(metaDesc);
-    }
-    metaDesc.content = "Sanni Ai - Generative Gallery, Code & Creative Portfolio";
-  }, []);
-
-  useEffect(() => {
     const fetchData = async () => {
       try {
         const [projectsRes, profileRes] = await Promise.all([fetch("/api/projects"), fetch("/api/profile")]);
@@ -173,13 +163,13 @@ export default function Home() {
     e.preventDefault();
     setIsSavingMedia(true);
     
-    const isTextBased = ["text", "code-display", "code-runner"].includes(formMediaType);
+    const isTextOrCode = formMediaType === "text" || formMediaType === "code";
 
     const projectData = {
       title: formTitle,
       description: formDesc,
       category: formCategory,
-      mediaUrl: !isTextBased ? formMediaUrl : "",
+      mediaUrl: !isTextOrCode ? formMediaUrl : "",
       coverArtUrl: formMediaType === "audio" ? formCoverArtUrl : "",
       externalLink: formExternalLink,
       mediaType: formMediaType,
@@ -188,7 +178,8 @@ export default function Home() {
       tags: formTags,
       date: formDate,
       artist: formArtist,
-      textContent: isTextBased ? formTextContent : "",
+      textContent: isTextOrCode ? formTextContent : "",
+      isRunnable: formMediaType === "code" ? formIsRunnable : false,
     };
 
     try {
@@ -237,6 +228,7 @@ export default function Home() {
     setFormDate(project.date || "");
     setFormArtist(project.artist || "");
     setFormTextContent(project.textContent || "");
+    setFormIsRunnable(project.isRunnable || false);
     
     setMediaMode(project.mediaUrl?.startsWith("data:") ? "upload" : "url");
     setCoverArtMode(project.coverArtUrl?.startsWith("data:") ? "upload" : "url");
@@ -258,6 +250,7 @@ export default function Home() {
     setFormDate("");
     setFormArtist("");
     setFormTextContent("");
+    setFormIsRunnable(false);
   };
 
   const confirmDeleteProject = async () => {
@@ -455,7 +448,7 @@ export default function Home() {
 
           <div className="w-full md:w-1/2 flex justify-center md:justify-end relative">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-fuchsia-600/20 rounded-full blur-[100px] pointer-events-none"></div>
-            {isLoading ? <div className="w-72 h-72 bg-zinc-900 rounded-2xl animate-pulse"></div> : <div className="w-72 h-72 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900 relative z-10 shadow-2xl">{profile.portraitImage ? <Image src={profile.portraitImage} alt="Profile" fill className="object-cover" loading="lazy" /> : <div className="flex items-center justify-center h-full text-zinc-700 text-sm">Add Portrait</div>}</div>}
+            {isLoading ? <div className="w-72 h-72 bg-zinc-900 rounded-2xl animate-pulse"></div> : <div className="w-72 h-72 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900 relative z-10 shadow-2xl">{profile.portraitImage ? <Image src={profile.portraitImage} alt="Profile" fill className="object-cover" /> : <div className="flex items-center justify-center h-full text-zinc-700 text-sm">Add Portrait</div>}</div>}
           </div>
         </section>
 
@@ -481,159 +474,139 @@ export default function Home() {
           ) : sortedProjects.length === 0 ? (
             <div className="py-32 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-2xl">Gallery is empty.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-              {sortedProjects.map((project) => {
-                const isTextBased = ["text", "code-display", "code-runner"].includes(project.mediaType || "");
-
-                return (
-                  <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col h-fit">
-                    
-                    {/* Media Area */}
-                    {(project.mediaUrl || isTextBased) && (
-                      <div className="w-full aspect-video bg-black relative overflow-hidden flex flex-col">
-                        
-                        {project.mediaType === "video" ? (
-                          <video 
-                            src={project.mediaUrl} 
-                            loop 
-                            muted 
-                            playsInline 
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                            onMouseEnter={(e) => {
-                              const vids = document.querySelectorAll('video');
-                              vids.forEach(v => {
-                                if (v !== e.currentTarget) {
-                                  v.pause();
-                                }
-                              });
-                              e.currentTarget.play();
-                            }}
-                            onMouseLeave={(e) => e.currentTarget.pause()}
-                          />
-                        ) : project.mediaType === "audio" ? (
-                          <div className="relative w-full h-full flex flex-col items-center justify-end">
-                             {project.coverArtUrl ? (
-                               <Image src={project.coverArtUrl} alt={project.title || "Cover Art"} fill loading="lazy" className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" />
-                             ) : (
-                               <div className="absolute inset-0 flex items-center justify-center text-zinc-700 text-xs">No Cover Art</div>
-                             )}
-                             <div className="z-10 w-full p-4 bg-gradient-to-t from-black via-black/80 to-transparent">
-                               <audio src={project.mediaUrl} controls className="w-full h-10 outline-none rounded-full" />
-                             </div>
-                          </div>
-                        ) : project.mediaType === "code-display" ? (
-                          <div className="w-full h-full bg-zinc-950 border-t border-cyan-500/30 p-4 overflow-y-auto custom-scrollbar relative shadow-[inset_0_0_30px_rgba(0,255,255,0.05)]">
-                            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
-                            <pre className="text-cyan-400 font-mono text-[10px] leading-relaxed whitespace-pre-wrap">
-                              {project.textContent}
-                            </pre>
-                          </div>
-                        ) : project.mediaType === "code-runner" ? (
-                          <iframe 
-                            srcDoc={project.textContent || ""} 
-                            className="w-full h-full bg-white border-none"
-                            sandbox="allow-scripts allow-same-origin"
-                            title={project.title || "Code Runner"}
-                          />
-                        ) : project.mediaType === "text" ? (
-                          <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center pb-16">
-                            <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
-                              &quot;{project.textContent}&quot;
-                            </blockquote>
-                          </div>
-                        ) : (
-                          <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill loading="lazy" className="object-cover group-hover:scale-105 transition-transform duration-700" />
-                        )}
-                        
-                        <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-40 pointer-events-none">
-                          {project.category}
-                        </span>
-
-                        {/* Title & Tool Overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent z-30 flex justify-between items-end gap-2 pointer-events-none">
-                          <h3 className="text-lg font-bold text-white truncate drop-shadow-md">{project.title || "Untitled"}</h3>
-                          {project.toolUsed && (
-                            <span className="text-[9px] font-mono text-fuchsia-400 bg-black/60 px-2 py-0.5 rounded border border-fuchsia-500/20 whitespace-nowrap backdrop-blur-md">
-                              {project.toolUsed}
-                            </span>
-                          )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+              {sortedProjects.map((project) => (
+                <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col h-fit">
+                  
+                  {/* Media Area */}
+                  {(project.mediaUrl || project.mediaType === "text" || project.mediaType === "code") && (
+                    <div className="w-full aspect-[4/3] bg-black relative overflow-hidden flex flex-col">
+                      {project.mediaType === "video" ? (
+                        <video 
+                          src={project.mediaUrl} 
+                          loop 
+                          muted 
+                          playsInline 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                          onMouseEnter={(e) => {
+                            document.querySelectorAll("video").forEach((vid) => {
+                              if (vid !== e.currentTarget) vid.pause();
+                            });
+                            e.currentTarget.play();
+                          }}
+                          onMouseLeave={(e) => e.currentTarget.pause()}
+                        />
+                      ) : project.mediaType === "audio" ? (
+                        <div className="relative w-full h-full flex flex-col items-center justify-end">
+                           {project.coverArtUrl ? (
+                             <Image src={project.coverArtUrl} alt={project.title || "Cover Art"} fill loading="lazy" className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" />
+                           ) : (
+                             <div className="absolute inset-0 flex items-center justify-center text-zinc-700 text-xs">No Cover Art</div>
+                           )}
+                           <div className="z-10 w-full p-4 bg-gradient-to-t from-black via-black/80 to-transparent">
+                             <audio src={project.mediaUrl} controls className="w-full h-10 outline-none rounded-full" />
+                           </div>
                         </div>
+                      ) : project.mediaType === "text" ? (
+                        <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center">
+                          <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
+                            {project.textContent}
+                          </blockquote>
+                        </div>
+                      ) : project.mediaType === "code" ? (
+                         project.isRunnable ? (
+                           <iframe srcDoc={project.textContent} sandbox="allow-scripts allow-same-origin" className="w-full h-full bg-white border-0" title={project.title || "Code"} />
+                         ) : (
+                           <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-start justify-start border border-cyan-500/30 relative">
+                             <div className="absolute top-0 left-0 w-full h-0.5 bg-cyan-500/50 shadow-[0_0_10px_#06b6d4]"></div>
+                             <pre className="text-cyan-400 font-mono text-xs whitespace-pre-wrap">
+                               {project.textContent}
+                             </pre>
+                           </div>
+                         )
+                      ) : (
+                        <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill loading="lazy" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                      )}
+                      
+                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-20">
+                        {project.category}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="p-6 flex flex-col gap-4">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-xl font-bold text-white">{project.title || "Untitled"}</h3>
+                      {project.toolUsed && <span className="text-[10px] font-mono text-fuchsia-400 bg-fuchsia-500/10 px-2 py-1 rounded border border-fuchsia-500/20 whitespace-nowrap">{project.toolUsed}</span>}
+                    </div>
+
+                    {/* Artist Display */}
+                    {project.artist && (
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-4 bg-fuchsia-500 rounded-full"></div>
+                        <span className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Artist: <span className="text-fuchsia-300">{project.artist}</span></span>
                       </div>
                     )}
 
-                    {/* Information Area - Tighter padding and smart rendering */}
-                    {((project.artist || project.description || project.promptUsed || project.tags || project.externalLink) && (
-                      <div className="p-4 flex flex-col gap-3">
-                        {/* Artist Display */}
-                        {project.artist && (
-                          <div className="flex items-center gap-2">
-                            <div className="h-1 w-3 bg-fuchsia-500 rounded-full"></div>
-                            <span className="text-[10px] font-semibold text-zinc-400 tracking-wider uppercase">Artist: <span className="text-fuchsia-300">{project.artist}</span></span>
-                          </div>
-                        )}
+                    {/* Description Display */}
+                    {project.description && (
+                      <p className="text-zinc-400 text-sm leading-relaxed border-l-2 border-zinc-800 pl-3 line-clamp-3">
+                        {project.description}
+                      </p>
+                    )}
 
-                        {/* Description Display */}
-                        {project.description && (
-                          <p className="text-zinc-400 text-xs leading-relaxed border-l-2 border-zinc-800 pl-3 line-clamp-3">
-                            {project.description}
-                          </p>
-                        )}
+                    {/* AI Prompt Section */}
+                    {project.promptUsed && (
+                      <div className="bg-zinc-950/80 p-3 rounded-lg border border-zinc-800 shadow-inner">
+                        <div className="flex items-center gap-2 mb-2">
+                           <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l3 3-3 3m5 0h3M4 12a8 8 0 1116 0 8 8 0 01-16 0z"></path></svg>
+                           <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Input Prompt</p>
+                        </div>
+                        <p className="text-[11px] text-emerald-400/80 font-mono line-clamp-3">{project.promptUsed}</p>
+                      </div>
+                    )}
 
-                        {/* AI Prompt Section */}
-                        {project.promptUsed && (
-                          <div className="bg-zinc-950/80 p-2.5 rounded-lg border border-zinc-800/50 shadow-inner">
-                            <div className="flex items-center gap-2 mb-1">
-                               <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l3 3-3 3m5 0h3M4 12a8 8 0 1116 0 8 8 0 01-16 0z"></path></svg>
-                               <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Input Prompt</p>
-                            </div>
-                            <p className="text-[10px] text-emerald-400/80 font-mono line-clamp-2">{project.promptUsed}</p>
-                          </div>
-                        )}
-
-                        {/* Tags & External Link Section aligned horizontally if possible */}
-                        {(project.tags || project.externalLink) && (
-                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-800/50">
-                            {project.tags && (
-                              <div className="flex flex-wrap gap-1.5 flex-1">
-                                {project.tags?.split(",").map(
-                                  (tag, i) =>
-                                    tag.trim() && (
-                                      <span key={i} className="text-[9px] bg-zinc-800/40 border border-zinc-700/50 px-2 py-0.5 rounded text-zinc-400">
-                                        #{tag.trim()}
-                                      </span>
-                                    )
-                                )}
-                              </div>
-                            )}
-
-                            {project.externalLink && (
-                              <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[9px] bg-white text-black py-1.5 px-3 rounded-full hover:bg-zinc-200 uppercase tracking-widest font-bold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap">
-                                View / Listen 
-                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                              </a>
-                            )}
-                          </div>
+                    {/* Tags Section */}
+                    {project.tags && (
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/50">
+                        {project.tags?.split(",").map(
+                          (tag, i) =>
+                            tag.trim() && (
+                              <span key={i} className="text-[10px] bg-zinc-800/50 border border-zinc-700/50 px-2 py-1 rounded-md text-zinc-400">
+                                #{tag.trim()}
+                              </span>
+                            )
                         )}
                       </div>
-                    ))}
+                    )}
 
-                    {isAdmin && (
-                      <div className="absolute top-3 left-3 flex gap-2 z-50">
-                        <button onClick={() => startEditProject(project)} className="bg-white text-black p-2 rounded-full shadow hover:bg-zinc-200">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                          </svg>
-                        </button>
-                        <button onClick={() => handleDeleteClick(project.id)} className="bg-red-500 text-white p-2 rounded-full shadow hover:bg-red-600">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                          </svg>
-                        </button>
+                    {/* External Link Section */}
+                    {project.externalLink && (
+                      <div className="mt-2 pt-4 border-t border-zinc-800/50">
+                        <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[10px] bg-white text-black py-2 px-4 rounded-full hover:bg-zinc-200 uppercase tracking-widest font-bold inline-flex items-center gap-2 transition-colors">
+                          View / Listen 
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        </a>
                       </div>
                     )}
                   </div>
-                );
-              })}
+
+                  {isAdmin && (
+                    <div className="absolute top-3 left-3 flex gap-2 z-30">
+                      <button onClick={() => startEditProject(project)} className="bg-white text-black p-2 rounded-full shadow hover:bg-zinc-200">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                        </svg>
+                      </button>
+                      <button onClick={() => handleDeleteClick(project.id)} className="bg-red-500 text-white p-2 rounded-full shadow hover:bg-red-600">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -677,20 +650,21 @@ export default function Home() {
 
                   <div className="space-y-2">
                      <label className="text-xs font-bold text-zinc-500 uppercase">Content Format</label>
-                     <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio" | "text" | "code-display" | "code-runner")} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
+                     <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio" | "text" | "code")} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="audio">Audio</option>
-                        <option value="text">Story / Quotes</option>
-                        <option value="code-display">Code (Cyberpunk Display)</option>
-                        <option value="code-runner">Code (Live Runner / iFrame)</option>
+                        <option value="text">Text (Stories)</option>
+                        <option value="code">Code</option>
                      </select>
                   </div>
 
-                  {["text", "code-display", "code-runner"].includes(formMediaType) ? (
+                  {formMediaType === "text" || formMediaType === "code" ? (
                     <div className="space-y-2 col-span-1 md:col-span-2">
-                      <label className="text-xs font-bold text-zinc-500 uppercase">Text / HTML / Code Content</label>
-                      <textarea value={formTextContent} onChange={(e) => setFormTextContent(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition font-mono text-xs" rows={8}></textarea>
+                      <label className="text-xs font-bold text-zinc-500 uppercase">
+                        {formMediaType === "code" ? "Code Content" : "Text Content (Story)"}
+                      </label>
+                      <textarea value={formTextContent} onChange={(e) => setFormTextContent(e.target.value)} className={`bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition ${formMediaType === "code" ? "font-mono text-sm" : ""}`} rows={6}></textarea>
                     </div>
                   ) : (
                     <div className="space-y-2 col-span-1 md:col-span-2">
@@ -701,6 +675,15 @@ export default function Home() {
                           Toggle Mode
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {formMediaType === "code" && (
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={formIsRunnable} onChange={(e) => setFormIsRunnable(e.target.checked)} className="accent-fuchsia-500 w-4 h-4" />
+                        <span className="text-xs font-bold text-zinc-500 uppercase">Make this code runnable (HTML/JS/CSS)</span>
+                      </label>
                     </div>
                   )}
 
