@@ -479,7 +479,7 @@ export default function Home() {
                       ) : project.mediaType === "text" ? (
                         <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center pb-16">
                           <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
-                            "{project.textContent}"
+                            {project.textContent}
                           </blockquote>
                         </div>
                       ) : (
