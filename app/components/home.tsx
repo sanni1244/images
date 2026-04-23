@@ -11,13 +11,12 @@ interface Project {
   mediaUrl?: string;
   coverArtUrl?: string;
   externalLink?: string; 
-  mediaType?: "image" | "video" | "audio" | "text";
+  mediaType?: "image" | "video" | "audio";
   promptUsed?: string;
   toolUsed?: string;
   tags?: string;
   date?: string;
   artist?: string;
-  textContent?: string;
 }
 
 interface Profile {
@@ -28,6 +27,8 @@ interface Profile {
   email?: string;
   instagram?: string;
   twitter?: string;
+  github?: string;
+  linkedin?: string;
   musicUrl?: string; 
   portraitImage?: string;
   tools?: string;
@@ -70,13 +71,12 @@ export default function Home() {
   const [formMediaUrl, setFormMediaUrl] = useState("");
   const [formCoverArtUrl, setFormCoverArtUrl] = useState("");
   const [formExternalLink, setFormExternalLink] = useState("");
-  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio" | "text">("image");
+  const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio">("image");
   const [formPromptUsed, setFormPromptUsed] = useState("");
   const [formToolUsed, setFormToolUsed] = useState("");
   const [formTags, setFormTags] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formArtist, setFormArtist] = useState("");
-  const [formTextContent, setFormTextContent] = useState("");
   
   const [mediaMode, setMediaMode] = useState<"url" | "upload">("url");
   const [coverArtMode, setCoverArtMode] = useState<"url" | "upload">("url");
@@ -153,7 +153,7 @@ export default function Home() {
       title: formTitle,
       description: formDesc,
       category: formCategory,
-      mediaUrl: formMediaType !== "text" ? formMediaUrl : "",
+      mediaUrl: formMediaUrl,
       coverArtUrl: formMediaType === "audio" ? formCoverArtUrl : "",
       externalLink: formExternalLink,
       mediaType: formMediaType,
@@ -162,7 +162,6 @@ export default function Home() {
       tags: formTags,
       date: formDate,
       artist: formArtist,
-      textContent: formMediaType === "text" ? formTextContent : "",
     };
 
     try {
@@ -210,7 +209,6 @@ export default function Home() {
     setFormTags(project.tags || "");
     setFormDate(project.date || "");
     setFormArtist(project.artist || "");
-    setFormTextContent(project.textContent || "");
     
     setMediaMode(project.mediaUrl?.startsWith("data:") ? "upload" : "url");
     setCoverArtMode(project.coverArtUrl?.startsWith("data:") ? "upload" : "url");
@@ -231,7 +229,6 @@ export default function Home() {
     setFormTags("");
     setFormDate("");
     setFormArtist("");
-    setFormTextContent("");
   };
 
   const confirmDeleteProject = async () => {
@@ -285,16 +282,19 @@ export default function Home() {
     }
   };
 
-  const allCategories = [
-    "All", "Images", "Videos", "Concept Art", "Music", 
-    "Quotes", "Books", "Stories", "3D Models", "Code"
-  ];
+  const allCategories = ["All", "Images", "Videos", "Music"];
   
   const visibleCategories = allCategories.filter(cat => 
     cat === "All" || projects.some(p => p.category === cat) || isAdmin
   );
 
   const filteredProjects = activeFilter === "All" ? projects : projects.filter((p) => p.category === activeFilter);
+  
+  const sortedProjects = [...filteredProjects].reverse().sort((a, b) => {
+    const dateA = a.date ? new Date(a.date).getTime() : 0;
+    const dateB = b.date ? new Date(b.date).getTime() : 0;
+    return dateB - dateA;
+  });
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans selection:bg-fuchsia-500 selection:text-white pb-24">
@@ -400,6 +400,16 @@ export default function Home() {
                     Twitter/X
                   </a>
                 )}
+                {profile.github && (
+                  <a href={profile.github} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
+                    GitHub
+                  </a>
+                )}
+                {profile.linkedin && (
+                  <a href={profile.linkedin} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
+                    LinkedIn
+                  </a>
+                )}
                 {profile.musicUrl && (
                   <a href={profile.musicUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
                     Music
@@ -439,14 +449,14 @@ export default function Home() {
 
           {isLoading ? (
             <div className="text-zinc-600">Loading generative art...</div>
-          ) : filteredProjects.length === 0 ? (
+          ) : sortedProjects.length === 0 ? (
             <div className="py-32 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-2xl">Gallery is empty.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 auto-rows-max">
-              {filteredProjects.map((project) => (
-                <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+              {sortedProjects.map((project) => (
+                <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col h-fit">
                   {/* Media Area */}
-                  {(project.mediaUrl || project.mediaType === "text") && (
+                  {project.mediaUrl && (
                     <div className="w-full aspect-[4/3] bg-black relative overflow-hidden flex flex-col">
                       {project.mediaType === "video" ? (
                         <video src={project.mediaUrl} autoPlay loop muted playsInline className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -461,26 +471,20 @@ export default function Home() {
                              <audio src={project.mediaUrl} controls className="w-full h-10 outline-none rounded-full" />
                            </div>
                         </div>
-                      ) : project.mediaType === "text" ? (
-                        <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center">
-                          <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
-                            &quot;{project.textContent}&quot;
-                          </blockquote>
-                        </div>
                       ) : (
-                        <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                        <Image src={project.mediaUrl} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                       )}
                       <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-20">{project.category}</span>
                     </div>
                   )}
 
-                  <div className="p-6 flex-1 flex flex-col gap-4">
+                  <div className="p-6 flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                       <h3 className="text-xl font-bold text-white">{project.title || "Untitled"}</h3>
                       {project.toolUsed && <span className="text-[10px] font-mono text-fuchsia-400 bg-fuchsia-500/10 px-2 py-1 rounded border border-fuchsia-500/20 whitespace-nowrap">{project.toolUsed}</span>}
                     </div>
 
-                    {/* Artist Display - Distinct Styling */}
+                    {/* Artist Display */}
                     {project.artist && (
                       <div className="flex items-center gap-2">
                         <div className="h-1 w-4 bg-fuchsia-500 rounded-full"></div>
@@ -488,14 +492,14 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Description Display - Distinct Styling */}
+                    {/* Description Display */}
                     {project.description && (
                       <p className="text-zinc-400 text-sm leading-relaxed border-l-2 border-zinc-800 pl-3 line-clamp-3">
                         {project.description}
                       </p>
                     )}
 
-                    {/* AI Prompt Section - Distinct Styling */}
+                    {/* AI Prompt Section */}
                     {project.promptUsed && (
                       <div className="bg-zinc-950/80 p-3 rounded-lg border border-zinc-800 shadow-inner">
                         <div className="flex items-center gap-2 mb-2">
@@ -506,9 +510,9 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Tags Section - Distinct Styling */}
+                    {/* Tags Section */}
                     {project.tags && (
-                      <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-zinc-800/50">
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/50">
                         {project.tags?.split(",").map(
                           (tag, i) =>
                             tag.trim() && (
@@ -590,30 +594,22 @@ export default function Home() {
 
                   <div className="space-y-2">
                      <label className="text-xs font-bold text-zinc-500 uppercase">Content Format</label>
-                     <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio" | "text")} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
+                     <select value={formMediaType} onChange={(e) => setFormMediaType(e.target.value as "image" | "video" | "audio")} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="audio">Audio</option>
-                        <option value="text">Text (Story, Quote, Book)</option>
                      </select>
                   </div>
 
-                  {formMediaType === "text" ? (
-                    <div className="space-y-2 col-span-1 md:col-span-2">
-                      <label className="text-xs font-bold text-zinc-500 uppercase">Text Content (Quote / Story)</label>
-                      <textarea value={formTextContent} onChange={(e) => setFormTextContent(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" rows={6}></textarea>
+                  <div className="space-y-2 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">Media Upload / Link</label>
+                    <div className="flex flex-col md:flex-row gap-2">
+                      {mediaMode === "url" ? <input type="url" placeholder="https://..." value={formMediaUrl} onChange={(e) => setFormMediaUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*,video/*,audio/*" onChange={(e) => handleFileUpload(e, setFormMediaUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
+                      <button type="button" onClick={() => setMediaMode(mediaMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
+                        Toggle Mode
+                      </button>
                     </div>
-                  ) : (
-                    <div className="space-y-2 col-span-1 md:col-span-2">
-                      <label className="text-xs font-bold text-zinc-500 uppercase">Media Upload / Link</label>
-                      <div className="flex flex-col md:flex-row gap-2">
-                        {mediaMode === "url" ? <input type="url" placeholder="https://..." value={formMediaUrl} onChange={(e) => setFormMediaUrl(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" /> : <input type="file" accept="image/*,video/*,audio/*" onChange={(e) => handleFileUpload(e, setFormMediaUrl)} className="bg-black border border-zinc-800 p-2 text-zinc-400 w-full rounded-xl file:bg-fuchsia-600 file:text-white file:border-0 file:py-1 file:px-3 file:rounded-lg focus:outline-none" />}
-                        <button type="button" onClick={() => setMediaMode(mediaMode === "url" ? "upload" : "url")} className="bg-zinc-800 px-4 py-3 md:py-0 rounded-xl text-xs font-bold text-zinc-300 hover:bg-zinc-700 whitespace-nowrap">
-                          Toggle Mode
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  </div>
 
                   {formMediaType === "audio" && (
                     <div className="space-y-2 col-span-1 md:col-span-2">
@@ -630,6 +626,11 @@ export default function Home() {
                   <div className="space-y-2 col-span-1 md:col-span-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">External Link (Optional)</label>
                     <input type="url" placeholder="https://spotify.com/..." value={formExternalLink} onChange={(e) => setFormExternalLink(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                  </div>
+
+                  <div className="space-y-2 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">Creation Date</label>
+                    <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
@@ -713,6 +714,16 @@ export default function Home() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Twitter/X URL</label>
                     <input type="url" value={editProfile.twitter || ""} onChange={(e) => setEditProfile({ ...editProfile, twitter: e.target.value })} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">GitHub URL</label>
+                    <input type="url" value={editProfile.github || ""} onChange={(e) => setEditProfile({ ...editProfile, github: e.target.value })} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">LinkedIn URL</label>
+                    <input type="url" value={editProfile.linkedin || ""} onChange={(e) => setEditProfile({ ...editProfile, linkedin: e.target.value })} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
                   
                   <div className="space-y-2 col-span-1 md:col-span-2">
