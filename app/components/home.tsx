@@ -12,13 +12,13 @@ interface Project {
   coverArtUrl?: string;
   externalLink?: string; 
   mediaType?: "image" | "video" | "audio" | "text" | "code";
+  codeType?: "display" | "run";
   promptUsed?: string;
   toolUsed?: string;
   tags?: string;
   date?: string;
   artist?: string;
   textContent?: string;
-  isRunnable?: boolean;
 }
 
 interface Profile {
@@ -44,6 +44,9 @@ export default function Home() {
 
   const [adminTab, setAdminTab] = useState<"profile" | "project">("project");
   const [activeFilter, setActiveFilter] = useState<string>("All");
+  
+  // Track globally which item is hovered so only one runs at a time
+  const [activeHoverId, setActiveHoverId] = useState<string | null>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [profile, setProfile] = useState<Profile>({
@@ -74,13 +77,13 @@ export default function Home() {
   const [formCoverArtUrl, setFormCoverArtUrl] = useState("");
   const [formExternalLink, setFormExternalLink] = useState("");
   const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio" | "text" | "code">("image");
+  const [formCodeType, setFormCodeType] = useState<"display" | "run">("display");
   const [formPromptUsed, setFormPromptUsed] = useState("");
   const [formToolUsed, setFormToolUsed] = useState("");
   const [formTags, setFormTags] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formArtist, setFormArtist] = useState("");
   const [formTextContent, setFormTextContent] = useState("");
-  const [formIsRunnable, setFormIsRunnable] = useState(false);
   
   const [mediaMode, setMediaMode] = useState<"url" | "upload">("url");
   const [coverArtMode, setCoverArtMode] = useState<"url" | "upload">("url");
@@ -90,15 +93,14 @@ export default function Home() {
   const [profileImageMode, setProfileImageMode] = useState<"url" | "upload">("url");
 
   useEffect(() => {
-    // Set Title & Favicon
     document.title = "Sanni Ai";
     let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
     if (!link) {
       link = document.createElement("link");
       link.rel = "icon";
-      document.getElementsByTagName("head")[0].appendChild(link);
+      document.head.appendChild(link);
     }
-    link.href = "https://cdn-icons-png.flaticon.com/512/1005/1005141.png"; // Free code icon
+    link.href = "https://cdn-icons-png.flaticon.com/512/1005/1005141.png";
 
     const fetchData = async () => {
       try {
@@ -163,23 +165,21 @@ export default function Home() {
     e.preventDefault();
     setIsSavingMedia(true);
     
-    const isTextOrCode = formMediaType === "text" || formMediaType === "code";
-
     const projectData = {
       title: formTitle,
       description: formDesc,
       category: formCategory,
-      mediaUrl: !isTextOrCode ? formMediaUrl : "",
+      mediaUrl: (formMediaType !== "text" && formMediaType !== "code") ? formMediaUrl : "",
       coverArtUrl: formMediaType === "audio" ? formCoverArtUrl : "",
       externalLink: formExternalLink,
       mediaType: formMediaType,
+      codeType: formMediaType === "code" ? formCodeType : undefined,
       promptUsed: formPromptUsed,
       toolUsed: formToolUsed,
       tags: formTags,
       date: formDate,
       artist: formArtist,
-      textContent: isTextOrCode ? formTextContent : "",
-      isRunnable: formMediaType === "code" ? formIsRunnable : false,
+      textContent: (formMediaType === "text" || formMediaType === "code") ? formTextContent : "",
     };
 
     try {
@@ -222,13 +222,13 @@ export default function Home() {
     setFormCoverArtUrl(project.coverArtUrl || "");
     setFormExternalLink(project.externalLink || "");
     setFormMediaType(project.mediaType || "image");
+    setFormCodeType(project.codeType || "display");
     setFormPromptUsed(project.promptUsed || "");
     setFormToolUsed(project.toolUsed || "");
     setFormTags(project.tags || "");
     setFormDate(project.date || "");
     setFormArtist(project.artist || "");
     setFormTextContent(project.textContent || "");
-    setFormIsRunnable(project.isRunnable || false);
     
     setMediaMode(project.mediaUrl?.startsWith("data:") ? "upload" : "url");
     setCoverArtMode(project.coverArtUrl?.startsWith("data:") ? "upload" : "url");
@@ -244,13 +244,13 @@ export default function Home() {
     setFormCoverArtUrl("");
     setFormExternalLink("");
     setFormMediaType("image");
+    setFormCodeType("display");
     setFormPromptUsed("");
     setFormToolUsed("");
     setFormTags("");
     setFormDate("");
     setFormArtist("");
     setFormTextContent("");
-    setFormIsRunnable(false);
   };
 
   const confirmDeleteProject = async () => {
@@ -304,7 +304,7 @@ export default function Home() {
     }
   };
 
-  const allCategories = ["All", "Images", "Videos", "Music", "Stories", "Code"];
+  const allCategories = ["All", "Images", "Videos", "Music", "Quotes", "Code", "Stories"];
   
   const visibleCategories = allCategories.filter(cat => 
     cat === "All" || projects.some(p => p.category === cat) || isAdmin
@@ -474,32 +474,44 @@ export default function Home() {
           ) : sortedProjects.length === 0 ? (
             <div className="py-32 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-2xl">Gallery is empty.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
               {sortedProjects.map((project) => (
-                <div key={project.id} className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col h-fit">
+                <div 
+                  key={project.id} 
+                  className="group relative bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden hover:border-fuchsia-500/50 transition-all duration-500 flex flex-col h-fit"
+                  onMouseEnter={() => {
+                    setActiveHoverId(project.id);
+                    if (project.mediaType === "video") {
+                      const vid = document.getElementById(`video-${project.id}`) as HTMLVideoElement;
+                      if (vid) vid.play().catch(() => {});
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    setActiveHoverId(null);
+                    if (project.mediaType === "video") {
+                      const vid = document.getElementById(`video-${project.id}`) as HTMLVideoElement;
+                      if (vid) vid.pause();
+                    }
+                  }}
+                >
                   
                   {/* Media Area */}
                   {(project.mediaUrl || project.mediaType === "text" || project.mediaType === "code") && (
-                    <div className="w-full aspect-[4/3] bg-black relative overflow-hidden flex flex-col">
+                    <div className="w-full aspect-video bg-black relative overflow-hidden flex flex-col">
                       {project.mediaType === "video" ? (
                         <video 
+                          id={`video-${project.id}`}
                           src={project.mediaUrl} 
-                          loop 
                           muted 
+                          loop 
                           playsInline 
+                          preload="none"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                          onMouseEnter={(e) => {
-                            document.querySelectorAll("video").forEach((vid) => {
-                              if (vid !== e.currentTarget) vid.pause();
-                            });
-                            e.currentTarget.play();
-                          }}
-                          onMouseLeave={(e) => e.currentTarget.pause()}
                         />
                       ) : project.mediaType === "audio" ? (
                         <div className="relative w-full h-full flex flex-col items-center justify-end">
                            {project.coverArtUrl ? (
-                             <Image src={project.coverArtUrl} alt={project.title || "Cover Art"} fill loading="lazy" className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" />
+                             <Image src={project.coverArtUrl} alt={project.title || "Cover Art"} fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" />
                            ) : (
                              <div className="absolute inset-0 flex items-center justify-center text-zinc-700 text-xs">No Cover Art</div>
                            )}
@@ -508,98 +520,111 @@ export default function Home() {
                            </div>
                         </div>
                       ) : project.mediaType === "text" ? (
-                        <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center">
+                        <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-center justify-center pb-16">
                           <blockquote className="text-zinc-300 italic font-serif leading-loose text-center text-sm">
-                            {project.textContent}
+                            &quot;{project.textContent}&quot;
                           </blockquote>
                         </div>
                       ) : project.mediaType === "code" ? (
-                         project.isRunnable ? (
-                           <iframe srcDoc={project.textContent} sandbox="allow-scripts allow-same-origin" className="w-full h-full bg-white border-0" title={project.title || "Code"} />
-                         ) : (
-                           <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-start justify-start border border-cyan-500/30 relative">
-                             <div className="absolute top-0 left-0 w-full h-0.5 bg-cyan-500/50 shadow-[0_0_10px_#06b6d4]"></div>
-                             <pre className="text-cyan-400 font-mono text-xs whitespace-pre-wrap">
-                               {project.textContent}
-                             </pre>
-                           </div>
-                         )
+                        project.codeType === "run" ? (
+                          <div className="w-full h-full bg-white relative flex items-center justify-center">
+                            {activeHoverId === project.id ? (
+                              <iframe srcDoc={project.textContent} title={project.title || "Code Runner"} sandbox="allow-scripts" className="w-full h-full border-none" />
+                            ) : (
+                              <div className="text-zinc-500 flex flex-col items-center gap-2 pb-10">
+                                <svg className="w-8 h-8 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span className="text-[10px] uppercase tracking-widest font-bold">Hover to Execute Code</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-full h-full bg-zinc-950 p-6 overflow-y-auto custom-scrollbar flex items-start border border-fuchsia-500/30 shadow-[inset_0_0_20px_rgba(217,70,239,0.1)] pb-16">
+                            <pre className="text-fuchsia-400 font-mono text-[10px] md:text-xs w-full whitespace-pre-wrap">
+                              <code>{project.textContent}</code>
+                            </pre>
+                          </div>
+                        )
                       ) : (
-                        <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill loading="lazy" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                        <Image src={project.mediaUrl || ""} alt={project.title || "AI Art"} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                       )}
                       
-                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-20">
+                      <span className="absolute top-3 right-3 text-[10px] bg-black/60 px-3 py-1 text-zinc-300 rounded-full uppercase tracking-widest backdrop-blur-md z-40">
                         {project.category}
                       </span>
+
+                      {/* Title & Tool Overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent z-30 flex justify-between items-end gap-2 pointer-events-none">
+                        <h3 className="text-lg font-bold text-white truncate drop-shadow-md">{project.title || "Untitled"}</h3>
+                        {project.toolUsed && (
+                          <span className="text-[9px] font-mono text-fuchsia-400 bg-black/60 px-2 py-0.5 rounded border border-fuchsia-500/20 whitespace-nowrap backdrop-blur-md">
+                            {project.toolUsed}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  <div className="p-6 flex flex-col gap-4">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-xl font-bold text-white">{project.title || "Untitled"}</h3>
-                      {project.toolUsed && <span className="text-[10px] font-mono text-fuchsia-400 bg-fuchsia-500/10 px-2 py-1 rounded border border-fuchsia-500/20 whitespace-nowrap">{project.toolUsed}</span>}
-                    </div>
-
-                    {/* Artist Display */}
-                    {project.artist && (
-                      <div className="flex items-center gap-2">
-                        <div className="h-1 w-4 bg-fuchsia-500 rounded-full"></div>
-                        <span className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Artist: <span className="text-fuchsia-300">{project.artist}</span></span>
-                      </div>
-                    )}
-
-                    {/* Description Display */}
-                    {project.description && (
-                      <p className="text-zinc-400 text-sm leading-relaxed border-l-2 border-zinc-800 pl-3 line-clamp-3">
-                        {project.description}
-                      </p>
-                    )}
-
-                    {/* AI Prompt Section */}
-                    {project.promptUsed && (
-                      <div className="bg-zinc-950/80 p-3 rounded-lg border border-zinc-800 shadow-inner">
-                        <div className="flex items-center gap-2 mb-2">
-                           <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l3 3-3 3m5 0h3M4 12a8 8 0 1116 0 8 8 0 01-16 0z"></path></svg>
-                           <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Input Prompt</p>
+                  {/* Information Area */}
+                  {((project.artist || project.description || project.promptUsed || project.tags || project.externalLink) && (
+                    <div className="p-4 flex flex-col gap-3">
+                      {project.artist && (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-3 bg-fuchsia-500 rounded-full"></div>
+                          <span className="text-[10px] font-semibold text-zinc-400 tracking-wider uppercase">Artist: <span className="text-fuchsia-300">{project.artist}</span></span>
                         </div>
-                        <p className="text-[11px] text-emerald-400/80 font-mono line-clamp-3">{project.promptUsed}</p>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Tags Section */}
-                    {project.tags && (
-                      <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-800/50">
-                        {project.tags?.split(",").map(
-                          (tag, i) =>
-                            tag.trim() && (
-                              <span key={i} className="text-[10px] bg-zinc-800/50 border border-zinc-700/50 px-2 py-1 rounded-md text-zinc-400">
-                                #{tag.trim()}
-                              </span>
-                            )
-                        )}
-                      </div>
-                    )}
+                      {project.description && (
+                        <p className="text-zinc-400 text-xs leading-relaxed border-l-2 border-zinc-800 pl-3 line-clamp-3">
+                          {project.description}
+                        </p>
+                      )}
 
-                    {/* External Link Section */}
-                    {project.externalLink && (
-                      <div className="mt-2 pt-4 border-t border-zinc-800/50">
-                        <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[10px] bg-white text-black py-2 px-4 rounded-full hover:bg-zinc-200 uppercase tracking-widest font-bold inline-flex items-center gap-2 transition-colors">
-                          View / Listen 
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                      {project.promptUsed && (
+                        <div className="bg-zinc-950/80 p-2.5 rounded-lg border border-zinc-800/50 shadow-inner">
+                          <div className="flex items-center gap-2 mb-1">
+                             <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l3 3-3 3m5 0h3M4 12a8 8 0 1116 0 8 8 0 01-16 0z"></path></svg>
+                             <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Input Prompt</p>
+                          </div>
+                          <p className="text-[10px] text-emerald-400/80 font-mono line-clamp-2">{project.promptUsed}</p>
+                        </div>
+                      )}
+
+                      {(project.tags || project.externalLink) && (
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-800/50">
+                          {project.tags && (
+                            <div className="flex flex-wrap gap-1.5 flex-1">
+                              {project.tags?.split(",").map(
+                                (tag, i) =>
+                                  tag.trim() && (
+                                    <span key={i} className="text-[9px] bg-zinc-800/40 border border-zinc-700/50 px-2 py-0.5 rounded text-zinc-400">
+                                      #{tag.trim()}
+                                    </span>
+                                  )
+                              )}
+                            </div>
+                          )}
+
+                          {project.externalLink && (
+                            <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[9px] bg-white text-black py-1.5 px-3 rounded-full hover:bg-zinc-200 uppercase tracking-widest font-bold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap">
+                              View / Listen 
+                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
 
                   {isAdmin && (
-                    <div className="absolute top-3 left-3 flex gap-2 z-30">
+                    <div className="absolute top-3 left-3 flex gap-2 z-50">
                       <button onClick={() => startEditProject(project)} className="bg-white text-black p-2 rounded-full shadow hover:bg-zinc-200">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                         </svg>
                       </button>
                       <button onClick={() => handleDeleteClick(project.id)} className="bg-red-500 text-white p-2 rounded-full shadow hover:bg-red-600">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
                       </button>
@@ -654,17 +679,25 @@ export default function Home() {
                         <option value="image">Image</option>
                         <option value="video">Video</option>
                         <option value="audio">Audio</option>
-                        <option value="text">Text (Stories)</option>
+                        <option value="text">Text (Story / Quote)</option>
                         <option value="code">Code</option>
                      </select>
                   </div>
 
-                  {formMediaType === "text" || formMediaType === "code" ? (
+                  {formMediaType === "code" && (
                     <div className="space-y-2 col-span-1 md:col-span-2">
-                      <label className="text-xs font-bold text-zinc-500 uppercase">
-                        {formMediaType === "code" ? "Code Content" : "Text Content (Story)"}
-                      </label>
-                      <textarea value={formTextContent} onChange={(e) => setFormTextContent(e.target.value)} className={`bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition ${formMediaType === "code" ? "font-mono text-sm" : ""}`} rows={6}></textarea>
+                       <label className="text-xs font-bold text-zinc-500 uppercase">Code Display Mode</label>
+                       <select value={formCodeType} onChange={(e) => setFormCodeType(e.target.value as "display" | "run")} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition">
+                          <option value="display">Cyberpunk Display</option>
+                          <option value="run">Run / Execute Block</option>
+                       </select>
+                    </div>
+                  )}
+
+                  {(formMediaType === "text" || formMediaType === "code") ? (
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase">Text / Code Content</label>
+                      <textarea value={formTextContent} onChange={(e) => setFormTextContent(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition font-mono" rows={6}></textarea>
                     </div>
                   ) : (
                     <div className="space-y-2 col-span-1 md:col-span-2">
@@ -675,15 +708,6 @@ export default function Home() {
                           Toggle Mode
                         </button>
                       </div>
-                    </div>
-                  )}
-
-                  {formMediaType === "code" && (
-                    <div className="space-y-2 col-span-1 md:col-span-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={formIsRunnable} onChange={(e) => setFormIsRunnable(e.target.checked)} className="accent-fuchsia-500 w-4 h-4" />
-                        <span className="text-xs font-bold text-zinc-500 uppercase">Make this code runnable (HTML/JS/CSS)</span>
-                      </label>
                     </div>
                   )}
 
