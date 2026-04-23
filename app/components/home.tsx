@@ -10,6 +10,7 @@ interface Project {
   category?: string;
   mediaUrl?: string;
   coverArtUrl?: string;
+  externalLink?: string; // URL for Spotify, YouTube, Soundcloud, etc.
   mediaType?: "image" | "video" | "audio";
   promptUsed?: string;
   toolUsed?: string;
@@ -25,6 +26,7 @@ interface Profile {
   email?: string;
   instagram?: string;
   twitter?: string;
+  musicUrl?: string; // General music link for the artist profile
   portraitImage?: string;
   tools?: string;
 }
@@ -65,6 +67,7 @@ export default function Home() {
   const [formCategory, setFormCategory] = useState("Images");
   const [formMediaUrl, setFormMediaUrl] = useState("");
   const [formCoverArtUrl, setFormCoverArtUrl] = useState("");
+  const [formExternalLink, setFormExternalLink] = useState("");
   const [formMediaType, setFormMediaType] = useState<"image" | "video" | "audio">("image");
   const [formPromptUsed, setFormPromptUsed] = useState("");
   const [formToolUsed, setFormToolUsed] = useState("");
@@ -148,6 +151,7 @@ export default function Home() {
       category: formCategory,
       mediaUrl: formMediaUrl,
       coverArtUrl: formMediaType === "audio" ? formCoverArtUrl : "",
+      externalLink: formExternalLink,
       mediaType: formMediaType,
       promptUsed: formPromptUsed,
       toolUsed: formToolUsed,
@@ -193,6 +197,7 @@ export default function Home() {
     setFormCategory(project.category || "Images");
     setFormMediaUrl(project.mediaUrl || "");
     setFormCoverArtUrl(project.coverArtUrl || "");
+    setFormExternalLink(project.externalLink || "");
     setFormMediaType(project.mediaType || "image");
     setFormPromptUsed(project.promptUsed || "");
     setFormToolUsed(project.toolUsed || "");
@@ -211,6 +216,7 @@ export default function Home() {
     setFormCategory("Images");
     setFormMediaUrl("");
     setFormCoverArtUrl("");
+    setFormExternalLink("");
     setFormMediaType("image");
     setFormPromptUsed("");
     setFormToolUsed("");
@@ -367,13 +373,18 @@ export default function Home() {
 
               <div className="flex flex-wrap gap-6 pt-6">
                 {profile.instagram && (
-                  <a href={profile.instagram} className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
+                  <a href={profile.instagram} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
                     Instagram
                   </a>
                 )}
                 {profile.twitter && (
-                  <a href={profile.twitter} className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
+                  <a href={profile.twitter} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
                     Twitter/X
+                  </a>
+                )}
+                {profile.musicUrl && (
+                  <a href={profile.musicUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-fuchsia-500 transition-colors uppercase tracking-widest text-xs font-bold">
+                    Music
                   </a>
                 )}
                 {profile.email && (
@@ -465,6 +476,15 @@ export default function Home() {
                           )
                       )}
                     </div>
+
+                    {project.externalLink && (
+                      <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                        <a href={project.externalLink} target="_blank" rel="noopener noreferrer" className="text-[10px] text-fuchsia-400 hover:text-fuchsia-300 uppercase tracking-widest font-bold flex items-center gap-1">
+                          View / Listen 
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {isAdmin && (
@@ -546,6 +566,11 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+                  
+                  <div className="space-y-2 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">External Link (Optional)</label>
+                    <input type="url" placeholder="https://spotify.com/..." value={formExternalLink} onChange={(e) => setFormExternalLink(e.target.value)} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                  </div>
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">AI Prompt Used</label>
@@ -628,6 +653,11 @@ export default function Home() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase">Twitter/X URL</label>
                     <input type="url" value={editProfile.twitter || ""} onChange={(e) => setEditProfile({ ...editProfile, twitter: e.target.value })} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
+                  </div>
+                  
+                  <div className="space-y-2 col-span-1 md:col-span-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase">Music / Streaming URL (Spotify, Soundcloud, etc.)</label>
+                    <input type="url" value={editProfile.musicUrl || ""} onChange={(e) => setEditProfile({ ...editProfile, musicUrl: e.target.value })} className="bg-black border border-zinc-800 p-3 text-white w-full rounded-xl focus:border-fuchsia-500 focus:outline-none transition" />
                   </div>
 
                   <div className="space-y-2 col-span-1 md:col-span-2">
